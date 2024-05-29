@@ -1,3 +1,4 @@
+use clap::Arg;
 use std::{
   env::args,
   fs::{File, FileTimes, OpenOptions},
