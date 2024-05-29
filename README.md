@@ -1,2 +1,3 @@
-# Rust Workspace Template
-A simple rust workspace template.
+# rtouch
+
+A very simple `touch` implementation written in the [Rust](https://www.rust-lang.org/) programming language.

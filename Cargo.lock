@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "main"
+name = "rtouch"
 version = "0.1.0"
