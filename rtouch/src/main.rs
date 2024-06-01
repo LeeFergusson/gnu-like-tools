@@ -1,3 +1,4 @@
+// Imports. -------------------------------------------------------------------
 use chrono::DateTime;
 use clap::Parser;
 use std::{
@@ -6,51 +7,7 @@ use std::{
   time::{Duration, SystemTime},
 };
 
-fn main() {
-  let args = Args::parse();
-  let mut provided_time = SystemTime::now();
-
-  // If a date was provided, attempt to parse it.
-  if let Some(ref time) = args.date {
-    let parsed_date =
-      chrono::DateTime::parse_from_str(&time, "%Y-%m-%d %H:%M:%S.%3f %z");
-    match parsed_date {
-      Ok(date) => {
-        if let Some(date_time) = DateTime::from_timestamp(0, 0) {
-          let duration = date.signed_duration_since(date_time);
-          provided_time = SystemTime::UNIX_EPOCH
-            + Duration::from_secs(duration.num_seconds() as u64);
-        }
-      }
-      Err(_) => {
-        eprintln!(
-          "Invalid date format. Use: -d \"YYYY-MM-DD HH:MM:SS.sss +HHMM\""
-        );
-      }
-    }
-  }
-
-  for file in &args.files {
-    if let Some(_) = args.date {
-      match update_file(file, provided_time, &args) {
-        Ok(_) => {}
-        Err(error) => {
-          eprintln!("Error updating file: {}", error);
-        }
-      }
-    } else {
-      match update_file(file, SystemTime::now(), &args) {
-        Ok(_) => {}
-        Err(error) => {
-          eprintln!("Error updating file: {}", error);
-        }
-      }
-    }
-  }
-}
-
 // Argument parsing. ----------------------------------------------------------
-
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 /// Update the access and modification times of each FILE to the current time.
@@ -78,6 +35,41 @@ struct Args {
   /// Files to update.
   #[arg(name = "FILES", required = true)]
   files: Vec<String>,
+}
+
+// Main entry point. ----------------------------------------------------------
+fn main() {
+  let args = Args::parse();
+  let mut file_time = SystemTime::now();
+
+  // If a date was provided, attempt to parse it.
+  if let Some(ref time) = args.date {
+    let parsed_date =
+      chrono::DateTime::parse_from_str(&time, "%Y-%m-%d %H:%M:%S.%3f %z");
+    match parsed_date {
+      Ok(date) => {
+        if let Some(date_time) = DateTime::from_timestamp(0, 0) {
+          let duration = date.signed_duration_since(date_time);
+          file_time = SystemTime::UNIX_EPOCH
+            + Duration::from_secs(duration.num_seconds() as u64);
+        }
+      }
+      Err(_) => {
+        eprintln!(
+          "Invalid date format. Use: -d \"YYYY-MM-DD HH:MM:SS.sss +HHMM\""
+        );
+      }
+    }
+  }
+
+  for file in &args.files {
+    match update_file(file, file_time, &args) {
+      Ok(_) => {}
+      Err(error) => {
+        eprintln!("Error updating file: {}", error);
+      }
+    }
+  }
 }
 
 // Functions. -----------------------------------------------------------------
@@ -116,6 +108,7 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
   Ok(())
 }
 
+/// Get the file times to update.
 fn get_file_times(time: SystemTime, args: &Args) -> Result<FileTimes, Error> {
   let file_times = FileTimes::new();
   if args.update_access_only {
