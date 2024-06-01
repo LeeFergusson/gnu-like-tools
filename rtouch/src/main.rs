@@ -1,17 +1,49 @@
+use chrono::DateTime;
 use clap::Parser;
 use std::{
   fs::{File, FileTimes, OpenOptions},
   io::{Error, ErrorKind},
+  time::{Duration, SystemTime},
 };
 
 fn main() {
   let args = Args::parse();
+  let mut provided_time = SystemTime::now();
+
+  // If a date was provided, attempt to parse it.
+  if let Some(ref time) = args.date {
+    let parsed_date =
+      chrono::DateTime::parse_from_str(&time, "%Y-%m-%d %H:%M:%S.%3f %z");
+    match parsed_date {
+      Ok(date) => {
+        if let Some(date_time) = DateTime::from_timestamp(0, 0) {
+          let duration = date.signed_duration_since(date_time);
+          provided_time = SystemTime::UNIX_EPOCH
+            + Duration::from_secs(duration.num_seconds() as u64);
+        }
+      }
+      Err(_) => {
+        eprintln!(
+          "Invalid date format. Use: -d \"YYYY-MM-DD HH:MM:SS.sss +HHMM\""
+        );
+      }
+    }
+  }
 
   for file in &args.files {
-    match update_file(file, &args) {
-      Ok(_) => {}
-      Err(error) => {
-        eprintln!("Error updating file: {}", error);
+    if let Some(_) = args.date {
+      match update_file(file, provided_time, &args) {
+        Ok(_) => {}
+        Err(error) => {
+          eprintln!("Error updating file: {}", error);
+        }
+      }
+    } else {
+      match update_file(file, SystemTime::now(), &args) {
+        Ok(_) => {}
+        Err(error) => {
+          eprintln!("Error updating file: {}", error);
+        }
       }
     }
   }
@@ -51,22 +83,17 @@ struct Args {
 // Functions. -----------------------------------------------------------------
 
 /// Update the access and modification times of a file.
-fn update_file(file: &str, args: &Args) -> Result<(), Error> {
+fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
   // Attempt to open the file for writing.
   match OpenOptions::new().write(true).open(file) {
-    Ok(file) => {
-      let time = std::time::SystemTime::now();
-      let file_times = FileTimes::new();
-
-      // Update the file's times depending on the arguments.
-      if args.update_access_only {
-        file.set_times(file_times.set_accessed(time))?;
-      } else if args.update_modification_only {
-        file.set_times(file_times.set_modified(time))?;
-      } else {
-        file.set_times(file_times.set_accessed(time).set_modified(time))?;
+    Ok(file) => match get_file_times(time, args) {
+      Ok(file_times) => {
+        file.set_times(file_times)?;
       }
-    }
+      Err(error) => {
+        eprintln!("{}", error);
+      }
+    },
     Err(error) => match error.kind() {
       ErrorKind::PermissionDenied => {
         eprintln!("Error updating file: Permission denied");
@@ -87,4 +114,15 @@ fn update_file(file: &str, args: &Args) -> Result<(), Error> {
     },
   };
   Ok(())
+}
+
+fn get_file_times(time: SystemTime, args: &Args) -> Result<FileTimes, Error> {
+  let file_times = FileTimes::new();
+  if args.update_access_only {
+    Ok(file_times.set_accessed(time))
+  } else if args.update_modification_only {
+    Ok(file_times.set_modified(time))
+  } else {
+    Ok(file_times.set_accessed(time).set_modified(time))
+  }
 }

@@ -7,25 +7,25 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'main'",
+      "name": "Debug executable 'rtouch'",
       "cargo": {
-        "args": ["build", "--bin=main", "--package=main"],
+        "args": ["build", "--bin=rtouch", "--package=rtouch"],
         "filter": {
-          "name": "main",
+          "name": "rtouch",
           "kind": "bin"
         }
       },
-      "args": ["myfile.txt"],
+      "args": ["file.txt"],
       "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'main'",
+      "name": "Debug unit tests in executable 'rtouch'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=main", "--package=main"],
+        "args": ["test", "--no-run", "--bin=rtouch", "--package=rtouch"],
         "filter": {
-          "name": "main",
+          "name": "rtouch",
           "kind": "bin"
         }
       },
