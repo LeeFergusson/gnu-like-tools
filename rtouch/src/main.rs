@@ -20,20 +20,20 @@ struct Args {
   #[arg(short('c'), long("no-create"), default_value = "false")]
   no_create: bool,
 
-  /// Parse the date string.
-  #[arg(short('d'), long("date"), default_value = None)]
-  date: Option<String>,
-
   /// Change the modification time only.
   #[arg(short('m'), long = None, conflicts_with = "update_access_only", default_value = "false")]
   update_modification_only: bool,
 
   /// Use this file's times instead of the current time.
-  #[arg(short('r'), long("reference"))]
+  #[arg(short('r'), long("reference"), conflicts_with = "time", default_value = None)]
   file_reference: Option<String>,
 
+  /// Parse the time string. - YYYY-MM-DD HH:MM:SS.sss +HHMM
+  #[arg(short('t'), long("time"), default_value = None, conflicts_with = "file_reference")]
+  time: Option<String>,
+
   /// Files to update.
-  #[arg(name = "FILES", required = true)]
+  #[arg(name = "FILE", required = true)]
   files: Vec<String>,
 }
 
@@ -42,7 +42,7 @@ fn main() {
   let args = Args::parse();
   let mut file_time = SystemTime::now();
 
-  if let Some(time) = &args.date {
+  if let Some(time) = &args.time {
     if let Some(system_time) = parse_time(&time) {
       file_time = system_time;
     }
@@ -110,7 +110,7 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
       ErrorKind::NotFound => {
         if !args.no_create {
           match File::create(file) {
-            Ok(_) => update_file(file, time, args)?,
+            Ok(_) => update_file(file, SystemTime::now(), args)?,
             Err(error) => eprintln!("Error creating file: {}", error),
           };
         }
@@ -133,6 +133,31 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
 /// * `FileTimes` - The file times to apply.
 fn get_file_times(time: SystemTime, args: &Args) -> FileTimes {
   let file_times = FileTimes::new();
+
+  if let Some(reference) = &args.file_reference {
+    match File::open(reference) {
+      Ok(file) => match file.metadata() {
+        Ok(metadata) => {
+          let accessed = metadata.accessed().unwrap();
+          let modified = metadata.modified().unwrap();
+
+          if args.update_access_only {
+            return file_times.set_accessed(accessed);
+          } else if args.update_modification_only {
+            return file_times.set_modified(modified);
+          } else {
+            return file_times.set_accessed(accessed).set_modified(modified);
+          }
+        }
+        Err(error) => {
+          eprintln!("Error getting file metadata: {}", error);
+        }
+      },
+      Err(error) => {
+        eprintln!("Error opening reference file: {}", error);
+      }
+    }
+  }
 
   if args.update_access_only {
     file_times.set_accessed(time)
