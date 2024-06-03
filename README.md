@@ -1,3 +1,5 @@
-# rtouch
+# GNU-Like Tools
 
-A very simple `touch` implementation written in the [Rust](https://www.rust-lang.org/) programming language.
+A small collection of GNU-Like tools. Created to aid on learning in my own Rust journey.
+
+- [rtouch](./rtouch/README.md)
