@@ -111,7 +111,9 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
         if !args.no_create {
           match File::create(file) {
             Ok(_) => update_file(file, SystemTime::now(), args)?,
-            Err(error) => eprintln!("Error creating file: {}", error),
+            Err(error) => {
+              eprintln!("Error creating file: {}", error)
+            },
           };
         }
       }
@@ -138,8 +140,24 @@ fn get_file_times(time: SystemTime, args: &Args) -> FileTimes {
     match File::open(reference) {
       Ok(file) => match file.metadata() {
         Ok(metadata) => {
-          let accessed = metadata.accessed().unwrap();
-          let modified = metadata.modified().unwrap();
+          let mut accessed = time;
+          match metadata.accessed() {
+            Ok(time) => {
+              accessed = time;
+            }
+            Err(error) => {
+              eprintln!("Error getting file metadata: {}", error)
+            }
+          }
+          let mut modified = time;
+          match metadata.modified() {
+            Ok(time) => {
+              modified = time;
+            }
+            Err(error) => {
+              eprintln!("Error getting file metadata: {}", error)
+            }
+          };
 
           if args.update_access_only {
             return file_times.set_accessed(accessed);
@@ -150,11 +168,11 @@ fn get_file_times(time: SystemTime, args: &Args) -> FileTimes {
           }
         }
         Err(error) => {
-          eprintln!("Error getting file metadata: {}", error);
+          eprintln!("Error getting file metadata: {}", error)
         }
       },
       Err(error) => {
-        eprintln!("Error opening reference file: {}", error);
+        eprintln!("Error opening reference file: {}", error)
       }
     }
   }
