@@ -3,8 +3,7 @@ use chrono::DateTime;
 use clap::Parser;
 use std::{
   fs::{File, FileTimes, OpenOptions},
-  io::{Error, ErrorKind},
-  time::{Duration, SystemTime},
+  io::{Error, ErrorKind}, time::{Duration, SystemTime}
 };
 
 // Argument parsing. ----------------------------------------------------------
@@ -40,16 +39,37 @@ struct Args {
 // Main entry point. ----------------------------------------------------------
 fn main() {
   let args = Args::parse();
-  let mut file_time = SystemTime::now();
+  let mut file_times = FileTimes::new();
+  let time = SystemTime::now();
+  file_times = file_times.set_accessed(time).set_modified(time);
 
+  // If a time is provided, use it instead of the current time.
   if let Some(time) = &args.time {
     if let Some(system_time) = parse_time(&time) {
-      file_time = system_time;
+      if args.update_access_only {
+        file_times = file_times.set_accessed(system_time);
+      } else if args.update_modification_only {
+        file_times = file_times.set_modified(system_time);
+      } else {
+        file_times = file_times.set_accessed(system_time).set_modified(system_time);
+      }
+    }
+  }
+  // If a file reference is provided, use its times instead of the current time.
+  else if let Some(reference) = &args.file_reference {
+    match parse_reference(reference, &args) {
+      Ok(times) => {
+        file_times = times;
+      }
+      Err(error) => {
+        eprintln!("Error parsing reference file: {}", error);
+      }
     }
   }
 
+  // Update the access and modification times of each file.
   for file in &args.files {
-    match update_file(file, file_time, &args) {
+    match update_file(file, file_times, &args) {
       Ok(_) => {}
       Err(error) => {
         eprintln!("Error updating file: {}", error);
@@ -88,6 +108,33 @@ fn parse_time(time: &str) -> Option<SystemTime> {
   None
 }
 
+/// ## Parse the reference file.
+/// 
+/// ### Arguments:
+/// * `path` - The path to the reference file.
+/// * `args` - The command line arguments.
+/// 
+/// ### Returns:
+/// * `Result<FileTimes, Error>` - The file times of the reference file.
+fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
+  let file_times = FileTimes::new();
+  let metadata = File::open(path)?.metadata()?;
+
+    
+  if args.update_access_only {
+    return Ok(file_times.set_accessed(metadata.accessed()?));
+  } else if args.update_modification_only {
+    return Ok(file_times.set_modified(metadata.modified()?));
+  } else {
+    return Ok(
+      file_times
+        .set_accessed(metadata.accessed()?)
+        .set_modified(metadata.modified()?)
+      );
+  }
+}
+
+
 /// ## Update the access and modification times of a file.
 ///
 /// ### Arguments:
@@ -97,10 +144,10 @@ fn parse_time(time: &str) -> Option<SystemTime> {
 ///
 /// ### Returns:
 /// * `Result<(), Error>` - The result of the operation.
-fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
+fn update_file(file: &str, time: FileTimes, args: &Args) -> Result<(), Error> {
   match OpenOptions::new().write(true).open(file) {
     Ok(file) => {
-      file.set_times(get_file_times(time, args))?;
+      file.set_times(time)?;
       return Ok(());
     }
     Err(error) => match error.kind() {
@@ -110,7 +157,7 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
       ErrorKind::NotFound => {
         if !args.no_create {
           match File::create(file) {
-            Ok(_) => update_file(file, SystemTime::now(), args)?,
+            Ok(_) => update_file(file,time, args)?,
             Err(error) => {
               eprintln!("Error creating file: {}", error)
             },
@@ -123,65 +170,4 @@ fn update_file(file: &str, time: SystemTime, args: &Args) -> Result<(), Error> {
     },
   };
   Ok(())
-}
-
-/// ## Get the file times to update.
-///
-/// ### Arguments:
-/// * `time` - The time to update the file to.
-/// * `args` - The command line arguments.
-///
-/// ### Returns:
-/// * `FileTimes` - The file times to apply.
-fn get_file_times(time: SystemTime, args: &Args) -> FileTimes {
-  let file_times = FileTimes::new();
-
-  if let Some(reference) = &args.file_reference {
-    match File::open(reference) {
-      Ok(file) => match file.metadata() {
-        Ok(metadata) => {
-          let mut accessed = time;
-          match metadata.accessed() {
-            Ok(time) => {
-              accessed = time;
-            }
-            Err(error) => {
-              eprintln!("Error getting file metadata: {}", error)
-            }
-          }
-          let mut modified = time;
-          match metadata.modified() {
-            Ok(time) => {
-              modified = time;
-            }
-            Err(error) => {
-              eprintln!("Error getting file metadata: {}", error)
-            }
-          };
-
-          if args.update_access_only {
-            return file_times.set_accessed(accessed);
-          } else if args.update_modification_only {
-            return file_times.set_modified(modified);
-          } else {
-            return file_times.set_accessed(accessed).set_modified(modified);
-          }
-        }
-        Err(error) => {
-          eprintln!("Error getting file metadata: {}", error)
-        }
-      },
-      Err(error) => {
-        eprintln!("Error opening reference file: {}", error)
-      }
-    }
-  }
-
-  if args.update_access_only {
-    file_times.set_accessed(time)
-  } else if args.update_modification_only {
-    file_times.set_modified(time)
-  } else {
-    file_times.set_accessed(time).set_modified(time)
-  }
 }
