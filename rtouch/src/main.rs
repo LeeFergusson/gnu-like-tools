@@ -1,3 +1,7 @@
+/// # rtouch
+/// 
+/// Update the access and modification times of each FILE to the current time.
+
 // Imports. -------------------------------------------------------------------
 use chrono::DateTime;
 use clap::Parser;
@@ -38,9 +42,9 @@ struct Args {
 
 // Main entry point. ----------------------------------------------------------
 fn main() {
+  let time = SystemTime::now();
   let args = Args::parse();
   let mut file_times = FileTimes::new();
-  let time = SystemTime::now();
   file_times = file_times.set_accessed(time).set_modified(time);
 
   // If a time is provided, use it instead of the current time.
@@ -72,7 +76,17 @@ fn main() {
     match update_file(file, file_times, &args) {
       Ok(_) => {}
       Err(error) => {
-        eprintln!("Error updating file: {}", error);
+        match error.kind() {
+          ErrorKind::PermissionDenied => {
+            eprintln!("Error updating file: Permission denied");
+          }
+          ErrorKind::Unsupported => {
+            eprintln!("Error updating file: Unsupported operation");
+          }
+          _ => {
+            eprintln!("Error updating file: {}", error);
+          }
+        }
       }
     }
   }
@@ -88,14 +102,12 @@ fn main() {
 /// ### Returns:
 /// * `Option<SystemTime>` - The parsed time.
 fn parse_time(time: &str) -> Option<SystemTime> {
-  let parsed_time = DateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S.%3f %z");
-  match parsed_time {
+  match DateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S.%3f %z") {
     Ok(offset) => {
       if let Some(date_time) = DateTime::from_timestamp(0, 0) {
-        let duration = offset.signed_duration_since(date_time);
         return Some(
           SystemTime::UNIX_EPOCH
-            + Duration::from_secs(duration.num_seconds() as u64),
+            + Duration::from_secs(offset.signed_duration_since(date_time).num_seconds() as u64),
         );
       }
     }
@@ -119,8 +131,7 @@ fn parse_time(time: &str) -> Option<SystemTime> {
 fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
   let file_times = FileTimes::new();
   let metadata = File::open(path)?.metadata()?;
-
-    
+  
   if args.update_access_only {
     return Ok(file_times.set_accessed(metadata.accessed()?));
   } else if args.update_modification_only {
@@ -133,7 +144,6 @@ fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
       );
   }
 }
-
 
 /// ## Update the access and modification times of a file.
 ///
@@ -148,12 +158,8 @@ fn update_file(file: &str, time: FileTimes, args: &Args) -> Result<(), Error> {
   match OpenOptions::new().write(true).open(file) {
     Ok(file) => {
       file.set_times(time)?;
-      return Ok(());
     }
     Err(error) => match error.kind() {
-      ErrorKind::PermissionDenied => {
-        eprintln!("Error updating file: Permission denied");
-      }
       ErrorKind::NotFound => {
         if !args.no_create {
           match File::create(file) {
@@ -165,7 +171,7 @@ fn update_file(file: &str, time: FileTimes, args: &Args) -> Result<(), Error> {
         }
       }
       _ => {
-        eprintln!("Error opening file: {}", error);
+        return Err(error)
       }
     },
   };
