@@ -32,7 +32,7 @@ struct Args {
   file_reference: Option<String>,
 
   /// Parse the time string. - YYYY-MM-DD HH:MM:SS.sss +HHMM
-  #[arg(short('t'), long("time"), default_value = None, conflicts_with = "file_reference")]
+  #[arg(short('t'), long("time"), default_value = None, conflicts_with = "FILE")]
   time: Option<String>,
 
   /// Files to update.
