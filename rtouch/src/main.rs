@@ -1,13 +1,13 @@
 /// # rtouch
-/// 
+///
 /// Update the access and modification times of each FILE to the current time.
-
 // Imports. -------------------------------------------------------------------
 use chrono::DateTime;
 use clap::Parser;
 use std::{
   fs::{File, FileTimes, OpenOptions},
-  io::{Error, ErrorKind}, time::{Duration, SystemTime}
+  io::{Error, ErrorKind},
+  time::{Duration, SystemTime},
 };
 
 // Argument parsing. ----------------------------------------------------------
@@ -28,7 +28,7 @@ struct Args {
   update_modification_only: bool,
 
   /// Use this file's times instead of the current time.
-  #[arg(short('r'), long("reference"), conflicts_with = "time", default_value = None)]
+  #[arg(name("FILE"),short('r'), long("reference"), conflicts_with = "time", default_value = None)]
   file_reference: Option<String>,
 
   /// Parse the time string. - YYYY-MM-DD HH:MM:SS.sss +HHMM
@@ -36,7 +36,7 @@ struct Args {
   time: Option<String>,
 
   /// Files to update.
-  #[arg(name = "FILE", required = true)]
+  #[arg(name = "FILES", required = true)]
   files: Vec<String>,
 }
 
@@ -55,7 +55,9 @@ fn main() {
       } else if args.update_modification_only {
         file_times = file_times.set_modified(system_time);
       } else {
-        file_times = file_times.set_accessed(system_time).set_modified(system_time);
+        file_times = file_times
+          .set_accessed(system_time)
+          .set_modified(system_time);
       }
     }
   }
@@ -75,19 +77,17 @@ fn main() {
   for file in &args.files {
     match update_file(file, file_times, &args) {
       Ok(_) => {}
-      Err(error) => {
-        match error.kind() {
-          ErrorKind::PermissionDenied => {
-            eprintln!("Error updating file: Permission denied");
-          }
-          ErrorKind::Unsupported => {
-            eprintln!("Error updating file: Unsupported operation");
-          }
-          _ => {
-            eprintln!("Error updating file: {}", error);
-          }
+      Err(error) => match error.kind() {
+        ErrorKind::PermissionDenied => {
+          eprintln!("Error updating file: Permission denied");
         }
-      }
+        ErrorKind::Unsupported => {
+          eprintln!("Error updating file: Unsupported operation");
+        }
+        _ => {
+          eprintln!("Error updating file: {}", error);
+        }
+      },
     }
   }
 }
@@ -107,7 +107,9 @@ fn parse_time(time: &str) -> Option<SystemTime> {
       if let Some(date_time) = DateTime::from_timestamp(0, 0) {
         return Some(
           SystemTime::UNIX_EPOCH
-            + Duration::from_secs(offset.signed_duration_since(date_time).num_seconds() as u64),
+            + Duration::from_secs(
+              offset.signed_duration_since(date_time).num_seconds() as u64,
+            ),
         );
       }
     }
@@ -121,17 +123,17 @@ fn parse_time(time: &str) -> Option<SystemTime> {
 }
 
 /// ## Parse the reference file.
-/// 
+///
 /// ### Arguments:
 /// * `path` - The path to the reference file.
 /// * `args` - The command line arguments.
-/// 
+///
 /// ### Returns:
 /// * `Result<FileTimes, Error>` - The file times of the reference file.
 fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
   let file_times = FileTimes::new();
   let metadata = File::open(path)?.metadata()?;
-  
+
   if args.update_access_only {
     return Ok(file_times.set_accessed(metadata.accessed()?));
   } else if args.update_modification_only {
@@ -140,8 +142,8 @@ fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
     return Ok(
       file_times
         .set_accessed(metadata.accessed()?)
-        .set_modified(metadata.modified()?)
-      );
+        .set_modified(metadata.modified()?),
+    );
   }
 }
 
@@ -163,16 +165,14 @@ fn update_file(file: &str, time: FileTimes, args: &Args) -> Result<(), Error> {
       ErrorKind::NotFound => {
         if !args.no_create {
           match File::create(file) {
-            Ok(_) => update_file(file,time, args)?,
+            Ok(_) => update_file(file, time, args)?,
             Err(error) => {
               eprintln!("Error creating file: {}", error)
-            },
+            }
           };
         }
       }
-      _ => {
-        return Err(error)
-      }
+      _ => return Err(error),
     },
   };
   Ok(())
