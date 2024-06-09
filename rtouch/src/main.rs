@@ -41,15 +41,16 @@ struct Args {
 }
 
 // Main entry point. ----------------------------------------------------------
-fn main() {
+fn main() -> Result<(), Error> {
   let time = SystemTime::now();
   let args = Args::parse();
   let mut file_times = FileTimes::new();
+  // The default is to update both the access and modification times.
   file_times = file_times.set_accessed(time).set_modified(time);
 
   // If a time is provided, use it instead of the current time.
   if let Some(time) = &args.time {
-    if let Some(system_time) = parse_time(&time) {
+    if let Ok(system_time) = parse_time(&time) {
       if args.update_access_only {
         file_times = file_times.set_accessed(system_time);
       } else if args.update_modification_only {
@@ -68,7 +69,21 @@ fn main() {
         file_times = times;
       }
       Err(error) => {
-        eprintln!("Error parsing reference file: {}", error);
+        let error_type = "Error parsing reference file:";
+        match error.kind() {
+          ErrorKind::NotFound => {
+            eprintln!("{} File not found", error_type);
+          }
+          ErrorKind::PermissionDenied => {
+            eprintln!("{} Permission denied", error_type);
+          }
+          ErrorKind::Unsupported => {
+            eprintln!("{} Unsupported operation", error_type);
+          }
+          _ => {
+            eprintln!("{} {}", error_type, error);
+          }
+        }
       }
     }
   }
@@ -77,19 +92,23 @@ fn main() {
   for file in &args.files {
     match update_file(file, file_times, &args) {
       Ok(_) => {}
-      Err(error) => match error.kind() {
-        ErrorKind::PermissionDenied => {
-          eprintln!("Error updating file: Permission denied");
+      Err(error) => {
+        let error_type = "Error updating file:";
+        match error.kind() {
+          ErrorKind::PermissionDenied => {
+            eprintln!("{} Permission denied", error_type);
+          }
+          ErrorKind::Unsupported => {
+            eprintln!("{} Unsupported operation", error_type);
+          }
+          _ => {
+            eprintln!("{} {}", error_type, error);
+          }
         }
-        ErrorKind::Unsupported => {
-          eprintln!("Error updating file: Unsupported operation");
-        }
-        _ => {
-          eprintln!("Error updating file: {}", error);
-        }
-      },
+      }
     }
   }
+  Ok(())
 }
 
 // Functions. -----------------------------------------------------------------
@@ -100,12 +119,12 @@ fn main() {
 /// * `time` - The time string to parse.
 ///
 /// ### Returns:
-/// * `Option<SystemTime>` - The parsed time.
-fn parse_time(time: &str) -> Option<SystemTime> {
+/// * `Result<SystemTime, Error>` - The parsed time.
+fn parse_time(time: &str) -> Result<SystemTime, Error> {
   match DateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S.%3f %z") {
     Ok(offset) => {
       if let Some(date_time) = DateTime::from_timestamp(0, 0) {
-        return Some(
+        return Ok(
           SystemTime::UNIX_EPOCH
             + Duration::from_secs(
               offset.signed_duration_since(date_time).num_seconds() as u64,
@@ -117,9 +136,10 @@ fn parse_time(time: &str) -> Option<SystemTime> {
       eprintln!(
         "Invalid date format. Use: -d \"YYYY-MM-DD HH:MM:SS.sss +HHMM\""
       );
+      return Err(Error::new(ErrorKind::InvalidInput, "Invalid date format"));
     }
   }
-  None
+  Err(Error::new(ErrorKind::InvalidInput, "Invalid date format"))
 }
 
 /// ## Parse the reference file.
