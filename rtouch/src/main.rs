@@ -168,15 +168,15 @@ fn parse_reference(path: &str, args: &Args) -> Result<FileTimes, Error> {
   let metadata = File::open(path)?.metadata()?;
 
   if args.update_access_only {
-    return Ok(file_times.set_accessed(metadata.accessed()?));
+    Ok(file_times.set_accessed(metadata.accessed()?))
   } else if args.update_modification_only {
-    return Ok(file_times.set_modified(metadata.modified()?));
+    Ok(file_times.set_modified(metadata.accessed()?))
   } else {
-    return Ok(
+    Ok(
       file_times
         .set_accessed(metadata.accessed()?)
         .set_modified(metadata.modified()?),
-    );
+    )
   }
 }
 
