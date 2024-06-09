@@ -50,15 +50,20 @@ fn main() -> Result<(), Error> {
 
   // If a time is provided, use it instead of the current time.
   if let Some(time) = &args.time {
-    if let Ok(system_time) = parse_time(&time) {
-      if args.update_access_only {
-        file_times = file_times.set_accessed(system_time);
-      } else if args.update_modification_only {
-        file_times = file_times.set_modified(system_time);
-      } else {
-        file_times = file_times
-          .set_accessed(system_time)
-          .set_modified(system_time);
+    match parse_time(time) {
+      Ok(system_time) => {
+        if args.update_access_only {
+          file_times = file_times.set_accessed(system_time);
+        } else if args.update_modification_only {
+          file_times = file_times.set_modified(system_time);
+        } else {
+          file_times = file_times
+            .set_accessed(system_time)
+            .set_modified(system_time);
+        }
+      }
+      Err(error) => {
+        eprintln!("Error parsing time: {}", error);
       }
     }
   }
