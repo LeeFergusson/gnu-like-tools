@@ -28,15 +28,15 @@ struct Args {
   update_modification_only: bool,
 
   /// Use this file's times instead of the current time.
-  #[arg(name("FILE"),short('r'), long("reference"), conflicts_with = "time", default_value = None)]
-  file_reference: Option<String>,
+  #[arg(short('r'), long("reference"), conflicts_with = "time", default_value = None)]
+  reference_file: Option<String>,
 
-  /// Parse the time string. - YYYY-MM-DD HH:MM:SS.sss +HHMM
-  #[arg(short('t'), long("time"), default_value = None, conflicts_with = "FILE")]
+  /// Attempt to parse the time string.
+  #[arg(short('t'), long("time"), default_value = None, conflicts_with = "reference_file")]
   time: Option<String>,
 
   /// Files to update.
-  #[arg(name = "FILES", required = true)]
+  #[arg(name = "FILE", required = true)]
   files: Vec<String>,
 }
 
@@ -68,7 +68,7 @@ fn main() -> Result<(), Error> {
     }
   }
   // If a file reference is provided, use its times instead of the current time.
-  else if let Some(reference) = &args.file_reference {
+  else if let Some(reference) = &args.reference_file {
     match parse_reference(reference, &args) {
       Ok(times) => {
         file_times = times;
