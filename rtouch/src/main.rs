@@ -121,25 +121,32 @@ fn main() -> Result<(), Error> {
 /// ### Returns:
 /// * `Result<SystemTime, Error>` - The parsed time.
 fn parse_time(time: &str) -> Result<SystemTime, Error> {
-  match DateTime::parse_from_str(time, "%Y-%m-%d %H:%M:%S.%3f %z") {
-    Ok(offset) => {
-      if let Some(date_time) = DateTime::from_timestamp(0, 0) {
-        return Ok(
-          SystemTime::UNIX_EPOCH
-            + Duration::from_secs(
-              offset.signed_duration_since(date_time).num_seconds() as u64,
-            ),
-        );
+  let formats = [
+    "%Y-%m-%dT%H:%M:%S.%3f%z",
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%S.%3f",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S.%3f%z",
+    "%Y-%m-%d %H:%M:%S%z",
+    "%Y-%m-%d %H:%M:%S.%3f",
+    "%Y-%m-%d %H:%M:%S",
+  ];
+  for format in formats {
+    match DateTime::parse_from_str(time, format) {
+      Ok(offset) => {
+        if let Some(date_time) = DateTime::from_timestamp(0, 0) {
+          return Ok(
+            SystemTime::UNIX_EPOCH
+              + Duration::from_secs(
+                offset.signed_duration_since(date_time).num_seconds() as u64,
+              ),
+          );
+        }
       }
-    }
-    Err(_) => {
-      eprintln!(
-        "Invalid date format. Use: -d \"YYYY-MM-DD HH:MM:SS.sss +HHMM\""
-      );
-      return Err(Error::new(ErrorKind::InvalidInput, "Invalid date format"));
+      Err(_) => continue,
     }
   }
-  Err(Error::new(ErrorKind::InvalidInput, "Invalid date format"))
+  Err(Error::new(ErrorKind::InvalidInput, "Unsupported date format"))
 }
 
 /// ## Parse the reference file.
