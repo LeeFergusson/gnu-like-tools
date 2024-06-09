@@ -127,14 +127,15 @@ fn main() -> Result<(), Error> {
 /// * `Result<SystemTime, Error>` - The parsed time.
 fn parse_time(time: &str) -> Result<SystemTime, Error> {
   let formats = [
+    // ISO 8601
     "%Y-%m-%dT%H:%M:%S.%3f%z",
     "%Y-%m-%dT%H:%M:%S%z",
-    "%Y-%m-%dT%H:%M:%S.%3f",
-    "%Y-%m-%dT%H:%M:%S",
+    // With SPACE as time separator
     "%Y-%m-%d %H:%M:%S.%3f%z",
     "%Y-%m-%d %H:%M:%S%z",
-    "%Y-%m-%d %H:%M:%S.%3f",
-    "%Y-%m-%d %H:%M:%S",
+    // Without time separator
+    "%Y-%m-%d%H:%M:%S.%3f%z",
+    "%Y-%m-%d%H:%M:%S%z",
   ];
   for format in formats {
     match DateTime::parse_from_str(time, format) {
