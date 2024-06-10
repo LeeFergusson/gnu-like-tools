@@ -1,5 +1,5 @@
 # GNU-Like Tools
 
-A small collection of GNU-Like tools. Created to aid on learning in my own Rust journey.
+A small collection of GNU-Like tools created in my own Rust learning journey. They are not intended to be replacements for those tools, and functionality may differ.
 
 - [rtouch](./rtouch/README.md)
