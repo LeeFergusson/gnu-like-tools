@@ -246,6 +246,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rcat"
+version = "0.2.0"
+
+[[package]]
 name = "rtouch"
 version = "0.1.0"
 dependencies = [
