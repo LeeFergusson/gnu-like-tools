@@ -24,16 +24,7 @@ fn main() {
   for passed_file in args.files {
     match File::open(&passed_file) {
       Ok(file) => {
-        let reader = BufReader::new(file);
-        let lines: Vec<String> = reader.lines().map(|line| {
-          match line {
-            Ok(value) => value,
-            Err(error) => {
-              eprintln!("Error reading file: {}", error);
-              exit(1)
-            }
-          }
-        }).collect();
+        let lines = split_into_lines(file);
 
         for (i, line) in lines.iter().enumerate() {
           if args.number {
@@ -59,4 +50,23 @@ fn main() {
       }
     }
   }
+}
+
+fn split_into_lines(file: File) -> Vec<String> {
+  let reader = BufReader::new(file);
+  reader.lines().map(|line| {
+    match line {
+      Ok(value) => value,
+      Err(error) => match error.kind() {
+        ErrorKind::InvalidData => {
+          eprintln!("Invalid UTF-8 data in file");
+          exit(1)
+        }
+        _ => {
+          eprintln!("Error reading file");
+          exit(1)
+        }
+      }
+    }
+  }).collect()
 }
