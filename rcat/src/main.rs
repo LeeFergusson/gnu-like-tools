@@ -9,6 +9,10 @@ use clap::Parser;
 struct Args {
   // Options --------------------------------------------------------
 
+  // Show line endings.
+  #[arg(short('E'), long("show-ends"))]
+  show_ends: bool,
+
   /// Number all output lines.
   #[arg(short('n'), long("number"))]
   number: bool,
@@ -20,53 +24,52 @@ struct Args {
 // ----------------------------------------------------------------------------
 fn main() {
   let args = Args::parse();
-  
-  for passed_file in args.files {
-    match File::open(&passed_file) {
-      Ok(file) => {
-        let lines = split_into_lines(file);
 
+  for path in args.files {
+    let _ = File::open(&path)
+      .map(|file| {
+        let lines = file_to_lines(file);
         for (i, line) in lines.iter().enumerate() {
+          let mut string_buffer;
+
           if args.number {
-            println!("{:6} {}", i + 1, line);
+            string_buffer = format!("{:6} {}", i + 1, line);
           } else {
-            println!("{}", line);
+            string_buffer = line.to_string();
           }
+          if args.show_ends {
+            string_buffer += "$";
+          }
+          println!("{}", string_buffer);
         }
-      }
-      Err(error) => match error.kind() {
+      })
+      .map_err(|error| match error.kind() {
         ErrorKind::NotFound => {
-          eprintln!("File not found: {}", passed_file);
+          eprintln!("File not found: {}", path);
           exit(1)
         }
         ErrorKind::PermissionDenied => {
-          eprintln!("Permission denied: {}", passed_file);
+          eprintln!("Permission denied: {}", path);
           exit(1)
         }
         _ => {
-          eprintln!("Error opening file: {}", passed_file);
+          eprintln!("Error opening file: {}", path);
           exit(1)
         }
-      }
-    }
+      });
   }
 }
 
-fn split_into_lines(file: File) -> Vec<String> {
-  let reader = BufReader::new(file);
-  reader.lines().map(|line| {
-    match line {
-      Ok(value) => value,
-      Err(error) => match error.kind() {
-        ErrorKind::InvalidData => {
-          eprintln!("Invalid UTF-8 data in file");
-          exit(1)
-        }
-        _ => {
-          eprintln!("Error reading file");
-          exit(1)
-        }
-      }
-    }
-  }).collect()
+/// ## Read file into a vector of lines.
+///
+/// ### Arguments
+/// * `file` - A file to read.
+///
+/// ### Returns
+/// A vector of lines.
+fn file_to_lines(file: File) -> Vec<String> {
+  BufReader::new(file)
+    .lines()
+    .map(|line| line.unwrap_or_default())
+    .collect()
 }
